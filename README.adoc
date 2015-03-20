@@ -1,0 +1,3 @@
+http://openjdk.java.net/projects/code-tools/jmh/[JMH] micro benchmark for Ehcache implementations.
+
+Currently requires Java 1.8 and tests against Ehcache 2.9.1 and 3.0.0-SNAPSHOT.
