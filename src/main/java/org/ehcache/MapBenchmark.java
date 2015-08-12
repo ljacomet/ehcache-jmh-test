@@ -31,12 +31,6 @@
 
 package org.ehcache;
 
-import net.sf.ehcache.Cache;
-import net.sf.ehcache.CacheManager;
-import net.sf.ehcache.Element;
-import net.sf.ehcache.config.CacheConfiguration;
-import net.sf.ehcache.config.Configuration;
-
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Mode;
@@ -44,7 +38,6 @@ import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
-import org.slf4j.LoggerFactory;
 
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
@@ -52,32 +45,20 @@ import java.util.concurrent.TimeUnit;
 
 import static java.lang.Math.abs;
 
-public class CacheBenchmark {
+public class MapBenchmark {
 
+  public static final int DATASET_SIZE = 2_000_000;
   static Random random = new Random();
 
   @State(Scope.Benchmark)
   public static class CacheHolder {
-    private Cache cache;
     private ConcurrentHashMap<Long, String> map;
-    private StandaloneCache<Long, String> myCache;
 
     @Setup
     public void setUp() {
-      map = new ConcurrentHashMap<>();
-
-      myCache = StandaloneCacheBuilder.newCacheBuilder(Long.class, String.class, LoggerFactory.getLogger(Ehcache.class + "-" + "GettingStarted"))
-          .build();
-      myCache.init();
-
-      CacheManager cacheManager = new CacheManager(new Configuration().name("test")
-          .cache(new CacheConfiguration().name("testCache").maxEntriesLocalHeap(20000)));
-      cache = cacheManager.getCache("testCache");
-      for (long l = 1L; l < 10000; l++) {
-        String value = "SomeValue" + l;
-        cache.put(new Element(l, value));
-        myCache.put(l, value);
-        map.put(l, value);
+      map = new ConcurrentHashMap<Long, String>();
+      for (long l = 1L; l < DATASET_SIZE; l++) {
+        map.put(l, "aValue" + l);
       }
     }
 
@@ -85,9 +66,9 @@ public class CacheBenchmark {
 
   @State(Scope.Thread)
   public static class SequenceHolder {
-    long index = random.nextLong() % 10000;
+    long index = random.nextLong() % DATASET_SIZE;
     public long getKey() {
-      return abs(index++ % 10000);
+      return abs(index++ % DATASET_SIZE);
     }
   }
 
@@ -95,23 +76,17 @@ public class CacheBenchmark {
   @Benchmark
   @BenchmarkMode(Mode.Throughput)
   @OutputTimeUnit(TimeUnit.SECONDS)
-  public String testGetEhcache3(CacheHolder cacheHolder, SequenceHolder sequenceHolder) {
-    return cacheHolder.myCache.get(sequenceHolder.getKey());
-  }
-
-  @Benchmark
-  @BenchmarkMode(Mode.Throughput)
-  @OutputTimeUnit(TimeUnit.SECONDS)
-  public Object testGetEhcache2(CacheHolder cacheHolder, SequenceHolder sequenceHolder) {
-    return cacheHolder.cache.get(sequenceHolder.getKey());
-  }
-
-  @Benchmark
-  @BenchmarkMode(Mode.Throughput)
-  @OutputTimeUnit(TimeUnit.SECONDS)
   public Object testComputeIfAbsentCHM(CacheHolder cacheHolder, SequenceHolder sequenceHolder) {
     long key = sequenceHolder.getKey();
     return cacheHolder.map.computeIfAbsent(key, k -> "SomeValue" + k);
+  }
+
+  @Benchmark
+  @BenchmarkMode(Mode.Throughput)
+  @OutputTimeUnit(TimeUnit.SECONDS)
+  public Object testComputeIfPresentCHM(CacheHolder cacheHolder, SequenceHolder sequenceHolder) {
+    long key = sequenceHolder.getKey();
+    return cacheHolder.map.computeIfPresent(key, (k, v) -> v);
   }
 
   @Benchmark
